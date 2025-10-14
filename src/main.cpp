@@ -179,6 +179,18 @@ void loop() {
   unsigned long uidDec = uidToDec32(mfrc522.uid);
   MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
 
+  // Envia dados em formato JSON para o script Python
+  Serial.print(F("{\"event\":\"rfid_read\",\"uid_decimal\":"));
+  Serial.print(uidDec);
+  Serial.print(F(",\"uid_hex\":\""));
+  Serial.print(uidHex);
+  Serial.print(F("\",\"card_type\":\""));
+  Serial.print(mfrc522.PICC_GetTypeName(piccType));
+  Serial.print(F("\",\"timestamp\":"));
+  Serial.print(millis());
+  Serial.println(F("}"));
+
+  // Também exibe para o usuário (opcional)
   Serial.println(F("----- TAG DETECTADA -----"));
   Serial.print(F("UID (HEX): ")); Serial.println(uidHex);
   Serial.print(F("UID (DEC): ")); Serial.println(uidDec);

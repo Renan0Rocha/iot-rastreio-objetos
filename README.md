@@ -120,6 +120,135 @@ upload_port = /dev/ttyACM0
 - ✅ Animação visual de espera
 - ✅ Anti-duplicação de leitura
 - ✅ Suporte para múltiplas leituras consecutivas
+- ✅ **Envio de dados via HTTP POST para API REST** (via bridge Python)
+
+## 🌐 Integração com API REST
+
+O projeto inclui um bridge Python que lê os dados do Arduino via Serial e envia para uma API REST via HTTP POST.
+
+### Formato JSON dos Dados Enviados
+
+```json
+{
+  "uid_decimal": 78901234,
+  "uid_hex": "04:A2:B3:C4",
+  "card_type": "MIFARE 1KB",
+  "date": "2025-10-13",
+  "time": "19:45:30",
+  "datetime": "2025-10-13T19:45:30",
+  "timestamp_ms": 1697224530000
+}
+```
+
+### Configuração do Bridge Python
+
+#### 1. Instalar Dependências
+
+```bash
+pip install -r requirements.txt
+```
+
+Ou manualmente:
+```bash
+pip install pyserial requests
+```
+
+#### 2. Configurar URL da API
+
+Edite o arquivo `rfid_bridge.py` e altere as seguintes configurações:
+
+```python
+# Porta serial (ajuste conforme necessário)
+SERIAL_PORT = '/dev/ttyACM0'  # Linux
+# SERIAL_PORT = 'COM3'        # Windows
+
+# URL da API
+API_URL = 'http://localhost:3000/api/rfid'  # Altere para sua URL
+```
+
+#### 3. Executar o Bridge
+
+Com o Arduino conectado e programado:
+
+```bash
+python3 rfid_bridge.py
+```
+
+Ou torne-o executável:
+```bash
+chmod +x rfid_bridge.py
+./rfid_bridge.py
+```
+
+### Exemplo de Saída do Bridge
+
+```
+============================================================
+🔌 RFID Bridge - Serial to HTTP
+============================================================
+
+📡 Porta Serial: /dev/ttyACM0
+⚡ Baud Rate:    115200
+🌐 API URL:      http://localhost:3000/api/rfid
+
+============================================================
+
+✅ Conectado! Aguardando leituras RFID...
+
+============================================================
+🎫 RFID DETECTADO
+============================================================
+UID (Decimal): 78901234
+UID (Hex):     04:A2:B3:C4
+Tipo:          MIFARE 1KB
+
+📋 Payload JSON:
+{
+  "uid_decimal": 78901234,
+  "uid_hex": "04:A2:B3:C4",
+  "card_type": "MIFARE 1KB",
+  "date": "2025-10-13",
+  "time": "19:45:30",
+  "datetime": "2025-10-13T19:45:30",
+  "timestamp_ms": 1697224530000
+}
+
+📤 Enviando para API: http://localhost:3000/api/rfid
+✅ Enviado com sucesso! Status: 200
+============================================================
+```
+
+### Exemplo de API (Node.js/Express)
+
+```javascript
+const express = require('express');
+const app = express();
+
+app.use(express.json());
+
+app.post('/api/rfid', (req, res) => {
+  const { uid_decimal, uid_hex, card_type, date, time } = req.body;
+  
+  console.log('RFID detectado:', {
+    uid_decimal,
+    uid_hex,
+    card_type,
+    date,
+    time
+  });
+  
+  // Processar dados (salvar no banco, etc.)
+  
+  res.status(200).json({ 
+    success: true, 
+    message: 'Dados recebidos com sucesso' 
+  });
+});
+
+app.listen(3000, () => {
+  console.log('API rodando na porta 3000');
+});
+```
 
 ## 🔧 Solução de Problemas
 
