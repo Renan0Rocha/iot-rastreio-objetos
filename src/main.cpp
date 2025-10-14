@@ -19,6 +19,30 @@ constexpr uint8_t PIN_RST = 9;   // RST
 
 MFRC522 mfrc522(PIN_SS, PIN_RST);
 
+// Função para testar comunicação básica
+bool testRC522Communication() {
+  // Reset manual do módulo
+  digitalWrite(PIN_RST, LOW);
+  delay(50);
+  digitalWrite(PIN_RST, HIGH);
+  delay(50);
+  
+  // Tenta ler o registrador várias vezes
+  for (int i = 0; i < 5; i++) {
+    byte version = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
+    Serial.print(F("Tentativa "));
+    Serial.print(i + 1);
+    Serial.print(F(": Versao = 0x"));
+    Serial.println(version, HEX);
+    
+    if (version != 0x00 && version != 0xFF) {
+      return true;
+    }
+    delay(100);
+  }
+  return false;
+}
+
 // --------- Helpers UID ----------
 String uidToHex(const MFRC522::Uid &uid) {
   String s;
@@ -68,12 +92,72 @@ void drawIdle() {
 
 void setup() {
   Serial.begin(115200);
+  while (!Serial) { delay(10); } // Aguarda serial estar pronta
+  
+  Serial.println(F("\n=== Leitor RFID RC522 (UNO) - Teste de Diagnostico ==="));
+  
+  // Configura os pinos
+  pinMode(PIN_RST, OUTPUT);
+  pinMode(PIN_SS, OUTPUT);
+  
+  Serial.println(F("Configurando pinos..."));
+  digitalWrite(PIN_RST, HIGH);
+  digitalWrite(PIN_SS, HIGH);
+  delay(100);
+  
+  Serial.println(F("Inicializando SPI..."));
   SPI.begin();
+  delay(100);
+  
+  Serial.println(F("Inicializando MFRC522..."));
   mfrc522.PCD_Init();
-  // mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max); // opcional
-
-  Serial.println(F("\n=== Leitor RFID RC522 (UNO) ==="));
-  Serial.println(F("Aproxime uma tag/cartao no sensor..."));
+  delay(100);
+  
+  Serial.println(F("\nTestando comunicacao com o modulo..."));
+  
+  if (testRC522Communication()) {
+    byte version = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
+    Serial.println(F("\n*** SUCESSO! ***"));
+    Serial.print(F("Versao do Firmware MFRC522: 0x"));
+    Serial.println(version, HEX);
+    
+    // Exibe informações sobre a versão
+    if (version == 0x91 || version == 0x92) {
+      Serial.println(F("Chip: MFRC522 v1.0 ou v2.0"));
+    } else if (version == 0x12) {
+      Serial.println(F("Chip: Counterfeit MFRC522"));
+    } else {
+      Serial.print(F("Chip: Versao desconhecida (0x"));
+      Serial.print(version, HEX);
+      Serial.println(F(")"));
+    }
+    
+    Serial.println(F("MFRC522 inicializado com sucesso!"));
+    
+    // Aumenta o ganho da antena para melhor leitura
+    mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max);
+    Serial.println(F("Ganho da antena configurado para maximo"));
+    
+    Serial.println(F("\n*** Aproxime uma tag/cartao no sensor... ***\n"));
+  } else {
+    Serial.println(F("\n*** ERRO: Falha na comunicacao com o MFRC522! ***"));
+    Serial.println(F("\nVerifique as conexoes:"));
+    Serial.println(F("  Pino RC522  ->  Arduino"));
+    Serial.println(F("  -----------------------"));
+    Serial.println(F("  SDA/SS      ->  D10"));
+    Serial.println(F("  SCK         ->  D13"));
+    Serial.println(F("  MOSI        ->  D11"));
+    Serial.println(F("  MISO        ->  D12"));
+    Serial.println(F("  RST         ->  D9"));
+    Serial.println(F("  3.3V        ->  3.3V"));
+    Serial.println(F("  GND         ->  GND"));
+    Serial.println(F("\nDicas:"));
+    Serial.println(F("- Verifique se os jumpers estao bem conectados"));
+    Serial.println(F("- O modulo deve estar alimentado com 3.3V (NAO 5V!)"));
+    Serial.println(F("- Teste trocar os jumpers por outros"));
+    Serial.println(F("- Verifique se o modulo nao esta com defeito"));
+    while (true) { delay(1000); } // Trava o programa
+  }
 }
 
 void loop() {
