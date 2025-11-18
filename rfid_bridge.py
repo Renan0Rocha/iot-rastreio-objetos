@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-RFID Bridge - Serial to HTTP
-Lê dados RFID do Arduino via Serial e envia para API REST via HTTP POST
+RFID Bridge - Serial to HTTP (Dois Leitores)
+Lê dados RFID de DOIS leitores RC522 via Serial e envia para API REST via HTTP POST
 
 Autor: Sistema IoT de Rastreamento de Objetos
-Data: Outubro 2025
+Data: Novembro 2025
+Versão: 2.0
 """
 
 import serial
@@ -13,21 +14,75 @@ import json
 from datetime import datetime
 import time
 import sys
+import os
 
 # ==================== CONFIGURAÇÕES ====================
-# Porta serial onde o Arduino está conectado
-SERIAL_PORT = '/dev/ttyACM0'  # Linux: /dev/ttyACM0 ou /dev/ttyUSB0
-                               # Windows: COM3, COM4, etc.
-                               # macOS: /dev/cu.usbmodem*
 
-# Baud rate (deve ser o mesmo configurado no Arduino)
-BAUD_RATE = 115200
+# Tenta carregar configurações do arquivo config.json
+CONFIG_FILE = 'config.json'
 
-# URL da API para onde enviar os dados
-API_URL = 'http://localhost:3000/api/rfid'  # Altere para sua URL
+def load_config():
+    """Carrega configurações do arquivo JSON ou usa valores padrão"""
+    default_config = {
+        "serial": {
+            "port": "/dev/ttyACM0",
+            "baud_rate": 115200,
+            "timeout": 1
+        },
+        "api": {
+            # You can use either a full `url` or split into `base_url` + `path`.
+            # Example full url: "http://localhost:3000/api/rfid"
+            # Or split: base_url: "http://localhost:3000", path: "/api/rfid"
+            "url": "http://localhost:3000/api/rfid",
+            "base_url": "",
+            "path": "/api/rfid",
+            # mode: 'full' -> send full payload; 'hex' -> send only uid_hex + reader
+            "mode": "hex",
+            "timeout": 5,
+            "headers": {
+                "Content-Type": "application/json",
+                "User-Agent": "RFID-Bridge/2.0"
+            }
+        },
+        "debug": {
+            "enabled": True,
+            "show_payload": True
+        }
+    }
+    
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                print(f"✅ Configurações carregadas de: {CONFIG_FILE}")
+                return config
+        except Exception as e:
+            print(f"⚠️  Erro ao ler {CONFIG_FILE}: {e}")
+            print(f"   Usando configurações padrão")
+    else:
+        print(f"ℹ️  Arquivo {CONFIG_FILE} não encontrado")
+        print(f"   Usando configurações padrão")
+        print(f"   Dica: Edite config.json para personalizar")
+    
+    return default_config
 
-# Timeout de requisição HTTP (segundos)
-REQUEST_TIMEOUT = 5
+# Carrega configurações
+config = load_config()
+
+SERIAL_PORT = config['serial']['port']
+BAUD_RATE = config['serial']['baud_rate']
+# Resolve API URL: prefer base_url+path if provided, otherwise use url
+api_conf = config.get('api', {})
+base = api_conf.get('base_url', '')
+path = api_conf.get('path', '')
+if base and base.strip():
+    API_URL = base.rstrip('/') + ('/' + path.lstrip('/') if path else '')
+else:
+    API_URL = api_conf.get('url')
+
+REQUEST_TIMEOUT = api_conf.get('timeout', 5)
+API_HEADERS = api_conf.get('headers', {})
+SEND_MODE = api_conf.get('mode', 'full')  # 'hex' or 'full'
 
 # Cor para terminal
 class Colors:
@@ -57,15 +112,61 @@ def create_payload(rfid_data):
     """
     now = datetime.now()
     
-    payload = {
-        "uid_decimal": rfid_data.get("uid_decimal"),
-        "uid_hex": rfid_data.get("uid_hex"),
-        "card_type": rfid_data.get("card_type"),
-        "date": now.strftime("%Y-%m-%d"),
-        "time": now.strftime("%H:%M:%S"),
-        "datetime": now.isoformat(),
-        "timestamp_ms": int(time.time() * 1000)
+    # Two payload modes: 'hex' -> minimal payload (uid_hex + reader + timestamp)
+    # 'full' -> include additional fields (decimal, card type, date/time)
+    if SEND_MODE == 'hex':
+        payload = {
+    now = datetime.now()
+
+    # Campos disponíveis e suas funções geradoras
+    available = {
+        "reader": lambda: rfid_data.get("reader", "unknown"),
+        "uid_decimal": lambda: rfid_data.get("uid_decimal"),
+        "uid_hex": lambda: rfid_data.get("uid_hex"),
+        "card_type": lambda: rfid_data.get("card_type"),
+        "date": lambda: now.strftime("%Y-%m-%d"),
+        "time": lambda: now.strftime("%H:%M:%S"),
+        "datetime": lambda: now.isoformat(),
+        "timestamp_ms": lambda: int(time.time() * 1000),
+        "arduino_timestamp": lambda: rfid_data.get("timestamp")
     }
+
+    # Ordem padrão caso o usuário não forneça payload_fields
+    default_fields = [
+        "reader",
+        "uid_decimal",
+        "uid_hex",
+        "card_type",
+        "date",
+        "time",
+        "datetime",
+        "timestamp_ms",
+        "arduino_timestamp"
+    ]
+
+    fields = default_fields
+    try:
+        api_cfg = config.get('api', {})
+        if isinstance(api_cfg.get('payload_fields'), list) and api_cfg.get('payload_fields'):
+            fields = api_cfg.get('payload_fields')
+    except Exception:
+        fields = default_fields
+
+    payload = {}
+    for f in fields:
+        if f in available:
+            try:
+                payload[f] = available[f]()
+            except Exception:
+                payload[f] = None
+        else:
+            # Se o campo pedido não existe entre os disponíveis,
+            # tentamos extrair direto do rfid_data (flexibilidade)
+            payload[f] = rfid_data.get(f)
+
+    return payload
+            "arduino_timestamp": rfid_data.get("timestamp")  # Timestamp do Arduino
+        }
     
     return payload
 
@@ -80,23 +181,19 @@ def send_to_api(payload):
         bool: True se enviado com sucesso, False caso contrário
     """
     try:
-        headers = {
-            'Content-Type': 'application/json',
-            'User-Agent': 'RFID-Bridge/1.0'
-        }
-        
         print_colored(f"📤 Enviando para API: {API_URL}", Colors.CYAN)
         
         response = requests.post(
             API_URL,
             json=payload,
-            headers=headers,
+            headers=API_HEADERS,
             timeout=REQUEST_TIMEOUT
         )
         
         if response.status_code in [200, 201]:
             print_colored(f"✅ Enviado com sucesso! Status: {response.status_code}", Colors.GREEN)
-            print_colored(f"   Resposta: {response.text[:100]}", Colors.GREEN)
+            if config['debug']['enabled']:
+                print_colored(f"   Resposta: {response.text[:100]}", Colors.GREEN)
             return True
         else:
             print_colored(f"⚠️  Resposta inesperada: {response.status_code}", Colors.YELLOW)
@@ -132,6 +229,7 @@ def process_serial_line(line):
             print_colored("\n" + "="*60, Colors.BOLD)
             print_colored("🎫 RFID DETECTADO", Colors.BOLD + Colors.BLUE)
             print_colored("="*60, Colors.BOLD)
+            print_colored(f"Leitor:        {rfid_data.get('reader', 'N/A')}", Colors.CYAN)
             print_colored(f"UID (Decimal): {rfid_data.get('uid_decimal')}", Colors.CYAN)
             print_colored(f"UID (Hex):     {rfid_data.get('uid_hex')}", Colors.CYAN)
             print_colored(f"Tipo:          {rfid_data.get('card_type')}", Colors.CYAN)
@@ -139,8 +237,9 @@ def process_serial_line(line):
             # Cria payload com data/hora
             payload = create_payload(rfid_data)
             
-            print_colored(f"\n📋 Payload JSON:", Colors.YELLOW)
-            print(json.dumps(payload, indent=2))
+            if config['debug']['show_payload']:
+                print_colored(f"\n📋 Payload JSON:", Colors.YELLOW)
+                print(json.dumps(payload, indent=2))
             
             # Envia para API
             send_to_api(payload)
@@ -158,12 +257,14 @@ def process_serial_line(line):
 def main():
     """Função principal"""
     print_colored("\n" + "="*60, Colors.BOLD)
-    print_colored("🔌 RFID Bridge - Serial to HTTP", Colors.BOLD + Colors.GREEN)
+    print_colored("🔌 RFID Bridge - Serial to HTTP (2 Leitores)", Colors.BOLD + Colors.GREEN)
     print_colored("="*60 + "\n", Colors.BOLD)
     
     print_colored(f"📡 Porta Serial: {SERIAL_PORT}", Colors.CYAN)
     print_colored(f"⚡ Baud Rate:    {BAUD_RATE}", Colors.CYAN)
     print_colored(f"🌐 API URL:      {API_URL}", Colors.CYAN)
+    print_colored(f"🔁 Modo envio:   {SEND_MODE}", Colors.CYAN)
+    print_colored(f"🎯 Leitores:     Leitor_1 (D10/D9) + Leitor_2 (D8/D7)", Colors.CYAN)
     print_colored(f"\n{'='*60}\n", Colors.BOLD)
     
     try:

@@ -1,0 +1,84 @@
+// ARQUIVO DE TESTE - Para testar cada leitor individualmente
+// 
+// INSTRUÇÕES:
+// 1. Conecte APENAS UM módulo RC522 por vez
+// 2. Teste primeiro em D10/D9
+// 3. Depois teste em D8/D7
+// 4. Renomeie para main.cpp para usar
+
+#include <Arduino.h>
+#include <SPI.h>
+#include <MFRC522.h>
+
+// ALTERE ESTES VALORES PARA TESTAR CADA PINO:
+// Para testar Leitor 1: use 10 e 9
+// Para testar Leitor 2: use 8 e 7
+constexpr uint8_t PIN_SS  = 10;  // MUDE PARA 8 para testar o segundo conjunto de pinos
+constexpr uint8_t PIN_RST = 9;   // MUDE PARA 7 para testar o segundo conjunto de pinos
+
+MFRC522 mfrc522(PIN_SS, PIN_RST);
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial) { delay(10); }
+  
+  Serial.println(F("\n=== TESTE INDIVIDUAL DE LEITOR RC522 ==="));
+  Serial.print(F("Testando pinos: SS=D"));
+  Serial.print(PIN_SS);
+  Serial.print(F(", RST=D"));
+  Serial.println(PIN_RST);
+  
+  pinMode(PIN_RST, OUTPUT);
+  pinMode(PIN_SS, OUTPUT);
+  
+  digitalWrite(PIN_RST, LOW);
+  delay(100);
+  digitalWrite(PIN_SS, HIGH);
+  digitalWrite(PIN_RST, HIGH);
+  delay(100);
+  
+  SPI.begin();
+  delay(100);
+  
+  mfrc522.PCD_Init();
+  delay(100);
+  
+  byte version = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
+  Serial.print(F("Versao detectada: 0x"));
+  Serial.println(version, HEX);
+  
+  if (version == 0x00 || version == 0xFF) {
+    Serial.println(F("\n*** ERRO: Modulo nao responde! ***"));
+    Serial.println(F("Verifique:"));
+    Serial.println(F("- Conexoes fisicas"));
+    Serial.println(F("- Alimentacao 3.3V"));
+    Serial.println(F("- Se o modulo esta conectado"));
+    while(true) { delay(1000); }
+  } else {
+    Serial.println(F("\n*** SUCESSO! Modulo funcionando! ***"));
+    if (version == 0x91 || version == 0x92) {
+      Serial.println(F("Chip: MFRC522 v1.0 ou v2.0"));
+    }
+    Serial.println(F("\nAproxime uma tag..."));
+  }
+}
+
+void loop() {
+  if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
+    delay(50);
+    return;
+  }
+  
+  Serial.println(F("\n----- TAG DETECTADA -----"));
+  Serial.print(F("UID: "));
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    if (mfrc522.uid.uidByte[i] < 0x10) Serial.print("0");
+    Serial.print(mfrc522.uid.uidByte[i], HEX);
+    if (i < mfrc522.uid.size - 1) Serial.print(":");
+  }
+  Serial.println();
+  Serial.println(F("-------------------------\n"));
+  
+  mfrc522.PICC_HaltA();
+  delay(500);
+}

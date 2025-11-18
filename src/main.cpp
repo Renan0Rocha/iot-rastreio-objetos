@@ -4,42 +4,88 @@
 #include <MFRC522.h>
 
 /*
-  Ligações RC522 (Arduino UNO):
-  SDA/SS -> D10
-  RST    -> D9
-  MOSI   -> D11
-  MISO   -> D12
-  SCK    -> D13
-  3.3V   -> 3.3V
-  GND    -> GND
+  Ligações RC522 (Arduino UNO) - DOIS LEITORES:
+  
+  Pinos compartilhados (barramento SPI):
+  MOSI   -> D11 (ambos leitores)
+  MISO   -> D12 (ambos leitores)
+  SCK    -> D13 (ambos leitores)
+  3.3V   -> 3.3V (ambos leitores)
+  GND    -> GND (ambos leitores)
+  
+  Pinos individuais:
+  Leitor 1 - SDA/SS -> D10, RST -> D9
+  Leitor 2 - SDA/SS -> D8,  RST -> D7
 */
 
-constexpr uint8_t PIN_SS  = 10;  // SDA/SS
-constexpr uint8_t PIN_RST = 9;   // RST
+// Leitor 1
+constexpr uint8_t PIN_SS1  = 10;
+constexpr uint8_t PIN_RST1 = 9;
 
-MFRC522 mfrc522(PIN_SS, PIN_RST);
+// Leitor 2
+constexpr uint8_t PIN_SS2  = 8;
+constexpr uint8_t PIN_RST2 = 7;
 
-// Função para testar comunicação básica
-bool testRC522Communication() {
+MFRC522 mfrc522_1(PIN_SS1, PIN_RST1);
+MFRC522 mfrc522_2(PIN_SS2, PIN_RST2);
+
+// Função para testar comunicação básica de um leitor
+bool testRC522Communication(MFRC522 &reader, uint8_t ssPin, uint8_t rstPin, const char* readerName) {
+  Serial.print(F("\nTestando "));
+  Serial.print(readerName);
+  Serial.println(F("..."));
+  
+  // Desabilita TODOS os outros SS primeiro
+  digitalWrite(PIN_SS1, HIGH);
+  digitalWrite(PIN_SS2, HIGH);
+  delay(10);
+  
   // Reset manual do módulo
-  digitalWrite(PIN_RST, LOW);
-  delay(50);
-  digitalWrite(PIN_RST, HIGH);
+  digitalWrite(rstPin, LOW);
+  delay(100);
+  digitalWrite(rstPin, HIGH);
+  delay(100);
+  
+  // Habilita apenas este leitor
+  digitalWrite(ssPin, LOW);
   delay(50);
   
   // Tenta ler o registrador várias vezes
   for (int i = 0; i < 5; i++) {
-    byte version = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
-    Serial.print(F("Tentativa "));
+    byte version = reader.PCD_ReadRegister(reader.VersionReg);
+    Serial.print(F("  Tentativa "));
     Serial.print(i + 1);
     Serial.print(F(": Versao = 0x"));
     Serial.println(version, HEX);
     
     if (version != 0x00 && version != 0xFF) {
+      // Desabilita o leitor novamente
+      digitalWrite(ssPin, HIGH);
+      
+      Serial.print(F("  *** "));
+      Serial.print(readerName);
+      Serial.println(F(" OK! ***"));
+      
+      if (version == 0x91 || version == 0x92) {
+        Serial.println(F("  Chip: MFRC522 v1.0 ou v2.0"));
+      } else if (version == 0x12) {
+        Serial.println(F("  Chip: Counterfeit MFRC522"));
+      } else {
+        Serial.print(F("  Chip: Versao desconhecida (0x"));
+        Serial.print(version, HEX);
+        Serial.println(F(")"));
+      }
       return true;
     }
     delay(100);
   }
+  
+  // Desabilita o leitor
+  digitalWrite(ssPin, HIGH);
+  
+  Serial.print(F("  *** ERRO: "));
+  Serial.print(readerName);
+  Serial.println(F(" nao responde! ***"));
   return false;
 }
 
@@ -94,120 +140,193 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) { delay(10); } // Aguarda serial estar pronta
   
-  Serial.println(F("\n=== Leitor RFID RC522 (UNO) - Teste de Diagnostico ==="));
+  Serial.println(F("\n=== Leitor RFID RC522 (UNO) - DOIS LEITORES ==="));
   
-  // Configura os pinos
-  pinMode(PIN_RST, OUTPUT);
-  pinMode(PIN_SS, OUTPUT);
+  // Configura os pinos dos DOIS leitores
+  pinMode(PIN_RST1, OUTPUT);
+  pinMode(PIN_SS1, OUTPUT);
+  pinMode(PIN_RST2, OUTPUT);
+  pinMode(PIN_SS2, OUTPUT);
   
   Serial.println(F("Configurando pinos..."));
-  digitalWrite(PIN_RST, HIGH);
-  digitalWrite(PIN_SS, HIGH);
+  
+  // MUITO IMPORTANTE: Fazer hard reset em ambos os módulos primeiro
+  digitalWrite(PIN_RST1, LOW);
+  digitalWrite(PIN_RST2, LOW);
+  delay(100);
+  
+  // SS deve estar HIGH (desabilitado) ANTES de ativar os módulos
+  digitalWrite(PIN_SS1, HIGH);
+  digitalWrite(PIN_SS2, HIGH);
+  delay(50);
+  
+  // Agora ativa os módulos (RST HIGH)
+  digitalWrite(PIN_RST1, HIGH);
+  digitalWrite(PIN_RST2, HIGH);
   delay(100);
   
   Serial.println(F("Inicializando SPI..."));
   SPI.begin();
   delay(100);
   
-  Serial.println(F("Inicializando MFRC522..."));
-  mfrc522.PCD_Init();
-  delay(100);
+  Serial.println(F("Inicializando leitores MFRC522..."));
   
-  Serial.println(F("\nTestando comunicacao com o modulo..."));
+  // Desabilita ambos os SS antes de inicializar
+  digitalWrite(PIN_SS1, HIGH);
+  digitalWrite(PIN_SS2, HIGH);
+  delay(10);
   
-  if (testRC522Communication()) {
-    byte version = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
-    Serial.println(F("\n*** SUCESSO! ***"));
-    Serial.print(F("Versao do Firmware MFRC522: 0x"));
-    Serial.println(version, HEX);
-    
-    // Exibe informações sobre a versão
-    if (version == 0x91 || version == 0x92) {
-      Serial.println(F("Chip: MFRC522 v1.0 ou v2.0"));
-    } else if (version == 0x12) {
-      Serial.println(F("Chip: Counterfeit MFRC522"));
-    } else {
-      Serial.print(F("Chip: Versao desconhecida (0x"));
-      Serial.print(version, HEX);
-      Serial.println(F(")"));
-    }
-    
-    Serial.println(F("MFRC522 inicializado com sucesso!"));
+  // Inicializa o leitor 1
+  digitalWrite(PIN_SS1, LOW);
+  delay(10);
+  mfrc522_1.PCD_Init();
+  delay(50);
+  digitalWrite(PIN_SS1, HIGH);
+  delay(50);
+  
+  // Inicializa o leitor 2
+  digitalWrite(PIN_SS2, LOW);
+  delay(10);
+  mfrc522_2.PCD_Init();
+  delay(50);
+  digitalWrite(PIN_SS2, HIGH);
+  delay(50);
+  
+  Serial.println(F("\nTestando comunicacao com os modulos..."));
+  
+  bool reader1OK = testRC522Communication(mfrc522_1, PIN_SS1, PIN_RST1, "Leitor 1 (SS=D10, RST=D9)");
+  bool reader2OK = testRC522Communication(mfrc522_2, PIN_SS2, PIN_RST2, "Leitor 2 (SS=D8, RST=D7)");
+  
+  if (reader1OK && reader2OK) {
+    Serial.println(F("\n*** SUCESSO! Ambos leitores funcionando! ***"));
     
     // Aumenta o ganho da antena para melhor leitura
-    mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max);
-    Serial.println(F("Ganho da antena configurado para maximo"));
+    digitalWrite(PIN_SS1, LOW);
+    delay(5);
+    mfrc522_1.PCD_SetAntennaGain(mfrc522_1.RxGain_max);
+    digitalWrite(PIN_SS1, HIGH);
+    delay(5);
     
-    Serial.println(F("\n*** Aproxime uma tag/cartao no sensor... ***\n"));
+    digitalWrite(PIN_SS2, LOW);
+    delay(5);
+    mfrc522_2.PCD_SetAntennaGain(mfrc522_2.RxGain_max);
+    digitalWrite(PIN_SS2, HIGH);
+    
+    Serial.println(F("Ganho das antenas configurado para maximo"));
+    
+    Serial.println(F("\n*** Aproxime tags/cartoes nos sensores... ***\n"));
   } else {
-    Serial.println(F("\n*** ERRO: Falha na comunicacao com o MFRC522! ***"));
+    Serial.println(F("\n*** ERRO: Um ou ambos leitores falharam! ***"));
     Serial.println(F("\nVerifique as conexoes:"));
-    Serial.println(F("  Pino RC522  ->  Arduino"));
-    Serial.println(F("  -----------------------"));
-    Serial.println(F("  SDA/SS      ->  D10"));
-    Serial.println(F("  SCK         ->  D13"));
+    Serial.println(F("  Pino RC522  ->  Arduino (AMBOS)"));
+    Serial.println(F("  ----------------------------------"));
     Serial.println(F("  MOSI        ->  D11"));
     Serial.println(F("  MISO        ->  D12"));
-    Serial.println(F("  RST         ->  D9"));
+    Serial.println(F("  SCK         ->  D13"));
     Serial.println(F("  3.3V        ->  3.3V"));
     Serial.println(F("  GND         ->  GND"));
+    Serial.println(F(""));
+    Serial.println(F("  Pinos individuais:"));
+    Serial.println(F("  Leitor 1 SDA/SS  ->  D10"));
+    Serial.println(F("  Leitor 1 RST     ->  D9"));
+    Serial.println(F("  Leitor 2 SDA/SS  ->  D8"));
+    Serial.println(F("  Leitor 2 RST     ->  D7"));
     Serial.println(F("\nDicas:"));
     Serial.println(F("- Verifique se os jumpers estao bem conectados"));
     Serial.println(F("- O modulo deve estar alimentado com 3.3V (NAO 5V!)"));
-    Serial.println(F("- Teste trocar os jumpers por outros"));
-    Serial.println(F("- Verifique se o modulo nao esta com defeito"));
-    while (true) { delay(1000); } // Trava o programa
+    Serial.println(F("- Cada leitor deve ter seu proprio pino SS/CS e RST"));
+    Serial.println(F("- Verifique se nao ha curto-circuito entre os pinos SS"));
+    
+    if (!reader1OK && !reader2OK) {
+      Serial.println(F("- Nenhum leitor respondeu: verifique alimentacao e SPI"));
+    }
+    
+    // Não trava - permite leitura parcial se um funcionar
   }
 }
 
-void loop() {
-  // Se não há nova tag, apenas anima a linha e retorna
-  if (!mfrc522.PICC_IsNewCardPresent()) {
-    drawIdle();
-    return;
+// Função auxiliar para processar leitura de um leitor
+bool processReader(MFRC522 &reader, uint8_t ssPin, const char* readerName) {
+  // Desabilita TODOS os leitores primeiro
+  digitalWrite(PIN_SS1, HIGH);
+  digitalWrite(PIN_SS2, HIGH);
+  delayMicroseconds(10);
+  
+  // Habilita apenas este leitor
+  digitalWrite(ssPin, LOW);
+  delayMicroseconds(10);
+  
+  if (!reader.PICC_IsNewCardPresent()) {
+    digitalWrite(ssPin, HIGH);  // Desabilita novamente
+    return false;
   }
-  if (!mfrc522.PICC_ReadCardSerial()) {
-    drawIdle();
-    return;
+  if (!reader.PICC_ReadCardSerial()) {
+    digitalWrite(ssPin, HIGH);  // Desabilita novamente
+    return false;
   }
 
   // Quebra a linha antes de imprimir os dados (pra não misturar com a animação)
   Serial.println();
 
   // Temos um UID válido
-  String uidHex = uidToHex(mfrc522.uid);
-  unsigned long uidDec = uidToDec32(mfrc522.uid);
-  MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
+  String uidHex = uidToHex(reader.uid);
+  unsigned long uidDec = uidToDec32(reader.uid);
+  MFRC522::PICC_Type piccType = reader.PICC_GetType(reader.uid.sak);
 
   // Envia dados em formato JSON para o script Python
-  Serial.print(F("{\"event\":\"rfid_read\",\"uid_decimal\":"));
+  Serial.print(F("{\"event\":\"rfid_read\",\"reader\":\""));
+  Serial.print(readerName);
+  Serial.print(F("\",\"uid_decimal\":"));
   Serial.print(uidDec);
   Serial.print(F(",\"uid_hex\":\""));
   Serial.print(uidHex);
   Serial.print(F("\",\"card_type\":\""));
-  Serial.print(mfrc522.PICC_GetTypeName(piccType));
+  Serial.print(reader.PICC_GetTypeName(piccType));
   Serial.print(F("\",\"timestamp\":"));
   Serial.print(millis());
   Serial.println(F("}"));
 
   // Também exibe para o usuário (opcional)
   Serial.println(F("----- TAG DETECTADA -----"));
+  Serial.print(F("Leitor: ")); Serial.println(readerName);
   Serial.print(F("UID (HEX): ")); Serial.println(uidHex);
   Serial.print(F("UID (DEC): ")); Serial.println(uidDec);
-  Serial.print(F("Tipo PICC : ")); Serial.println(mfrc522.PICC_GetTypeName(piccType));
+  Serial.print(F("Tipo PICC : ")); Serial.println(reader.PICC_GetTypeName(piccType));
   Serial.println(F("-------------------------"));
 
   // Finaliza comunicação com a tag até ser removida
-  mfrc522.PICC_HaltA();
-  mfrc522.PCD_StopCrypto1();
+  reader.PICC_HaltA();
+  reader.PCD_StopCrypto1();
+  
+  // Desabilita o leitor
+  digitalWrite(ssPin, HIGH);
 
-  // Espera a tag sair do campo (anti-duplicação)
-  delay(200);
-  while (mfrc522.PICC_IsNewCardPresent() || mfrc522.PICC_ReadCardSerial()) {
-    delay(50);
+  return true;
+}
+
+void loop() {
+  // Tenta ler do Leitor 1
+  bool read1 = processReader(mfrc522_1, PIN_SS1, "Leitor_1");
+  
+  // Tenta ler do Leitor 2
+  bool read2 = processReader(mfrc522_2, PIN_SS2, "Leitor_2");
+  
+  // Se algum leitor detectou tag, aguarda anti-duplicação
+  if (read1 || read2) {
+    delay(200);
+    // Limpa possíveis leituras pendentes
+    while (mfrc522_1.PICC_IsNewCardPresent() || mfrc522_1.PICC_ReadCardSerial()) {
+      delay(50);
+    }
+    while (mfrc522_2.PICC_IsNewCardPresent() || mfrc522_2.PICC_ReadCardSerial()) {
+      delay(50);
+    }
+    
+    // Reseta a animação e volta a exibir a linha de espera
+    animCount = 0;
+    Serial.println(F("\nAproxime tags/cartoes nos sensores..."));
+  } else {
+    // Se nenhum detectou, anima a linha de espera
+    drawIdle();
   }
-
-  // Reseta a animação e volta a exibir a linha de espera
-  animCount = 0;
-  Serial.println(F("\nAproxime uma tag/cartao no sensor..."));
 }

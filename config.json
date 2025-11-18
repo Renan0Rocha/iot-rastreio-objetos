@@ -1,0 +1,19 @@
+{
+  "serial": {
+    "port": "/dev/ttyACM0",
+    "baud_rate": 115200,
+    "timeout": 1
+  },
+  "api": {
+    "url": "http://localhost:3000/api/rfid",
+    "timeout": 5,
+    "headers": {
+      "Content-Type": "application/json",
+      "User-Agent": "RFID-Bridge/2.0"
+    }
+  },
+  "debug": {
+    "enabled": true,
+    "show_payload": true
+  }
+}
