@@ -71,14 +71,16 @@ config = load_config()
 
 SERIAL_PORT = config['serial']['port']
 BAUD_RATE = config['serial']['baud_rate']
-# Resolve API URL: prefer base_url+path if provided, otherwise use url
+
+# Resolve API URL: prefer base_url+route if provided, otherwise use url
 api_conf = config.get('api', {})
 base = api_conf.get('base_url', '')
-path = api_conf.get('path', '')
+route = api_conf.get('route', api_conf.get('path', ''))  # aceita 'route' ou 'path'
+
 if base and base.strip():
-    API_URL = base.rstrip('/') + ('/' + path.lstrip('/') if path else '')
+    API_URL = base.rstrip('/') + ('/' + route.lstrip('/') if route else '')
 else:
-    API_URL = api_conf.get('url')
+    API_URL = api_conf.get('url', 'http://localhost:3000/api/rfid')
 
 REQUEST_TIMEOUT = api_conf.get('timeout', 5)
 API_HEADERS = api_conf.get('headers', {})
@@ -102,7 +104,11 @@ def print_colored(message, color=Colors.END):
 
 def create_payload(rfid_data):
     """
-    Cria o payload JSON para enviar à API
+    Cria o payload JSON para enviar à API.
+    
+    A lista de campos a enviar pode ser personalizada via
+    config['api']['payload_fields'] (array de strings). Se não
+    existir, usa um conjunto padrão completo.
     
     Args:
         rfid_data (dict): Dados do RFID lidos do Arduino
@@ -110,12 +116,6 @@ def create_payload(rfid_data):
     Returns:
         dict: Payload formatado com timestamp
     """
-    now = datetime.now()
-    
-    # Two payload modes: 'hex' -> minimal payload (uid_hex + reader + timestamp)
-    # 'full' -> include additional fields (decimal, card type, date/time)
-    if SEND_MODE == 'hex':
-        payload = {
     now = datetime.now()
 
     # Campos disponíveis e suas funções geradoras
@@ -164,10 +164,6 @@ def create_payload(rfid_data):
             # tentamos extrair direto do rfid_data (flexibilidade)
             payload[f] = rfid_data.get(f)
 
-    return payload
-            "arduino_timestamp": rfid_data.get("timestamp")  # Timestamp do Arduino
-        }
-    
     return payload
 
 def send_to_api(payload):

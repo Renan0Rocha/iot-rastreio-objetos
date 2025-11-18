@@ -80,7 +80,6 @@ bool testRC522Communication(MFRC522 &reader, uint8_t ssPin, uint8_t rstPin, cons
     delay(100);
   }
   
-  // Desabilita o leitor
   digitalWrite(ssPin, HIGH);
   
   Serial.print(F("  *** ERRO: "));
