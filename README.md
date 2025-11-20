@@ -1,128 +1,399 @@
-# 🏷️ Sistema RFID - Rastreamento de Objetos IoT# Leitor RFID RC522 - Arduino UNO
+# 🏷️ Sistema RFID - Rastreamento IoT# 🏷️ Sistema RFID - Rastreamento IoT# 🏷️ Sistema RFID - Rastreamento de Objetos IoT# Leitor RFID RC522 - Arduino UNO
 
 
 
-Sistema de leitura RFID com **2 leitores RC522** no Arduino UNO que envia dados automaticamente via HTTP POST para uma API.Projeto de leitura de tags RFID usando o módulo RC522 com Arduino UNO.
+Sistema com **2 leitores RFID RC522** no Arduino UNO que envia leituras automaticamente para o frontend via API.
 
 
 
-## 🔌 Hardware## 📋 Componentes Necessários
+## ⚡ Quick StartSistema com **2 leitores RFID RC522** no Arduino UNO que envia leituras automaticamente para o frontend via API.
 
 
 
-### Componentes- Arduino UNO
-
-- Arduino UNO- Módulo RFID RC522
-
-- 2x Módulos RFID RC522- Jumpers para conexão
-
-- Jumpers- Cabo USB para programação
-
-- Tags/cartões RFID 13.56MHz- Tags/cartões RFID (13.56MHz)
+### 1. Hardware - Conectar os Leitores
 
 
 
-### Conexões## 🔌 Esquema de Ligação
+**Pinos Compartilhados (SPI):** MOSI→D11, MISO→D12, SCK→D13, 3.3V, GND  ## ⚡ Quick StartSistema de leitura RFID com **2 leitores RC522** no Arduino UNO que envia dados automaticamente via HTTP POST para uma API.Projeto de leitura de tags RFID usando o módulo RC522 com Arduino UNO.
+
+**Leitor 1:** SDA→D10, RST→D9  
+
+**Leitor 2:** SDA→D8, RST→D7
 
 
 
-**Pinos Compartilhados (SPI):**Conecte o módulo RC522 ao Arduino UNO conforme o esquema abaixo:
+⚠️ **Cada leitor precisa de SDA/SS e RST próprios!**### 1. Hardware - Conectar os Leitores
 
-| Pino RC522 | Arduino |
 
-|------------|---------|| Pino RC522 | Pino Arduino UNO |
 
-| MOSI       | D11     ||------------|------------------|
+### 2. Programar o Arduino
 
-| MISO       | D12     || SDA/SS     | D10              |
 
-| SCK        | D13     || SCK        | D13              |
 
-| 3.3V       | 3.3V    || MOSI       | D11              |
-
-| GND        | GND     || MISO       | D12              |
-
-| RST        | D9               |
-
-**Pinos Individuais:**| 3.3V       | 3.3V             |
-
-| Leitor | SDA/SS | RST || GND        | GND              |
-
-|--------|--------|-----|
-
-| 1      | D10    | D9  |⚠️ **IMPORTANTE**: O módulo RC522 opera em **3.3V**. Não conecte ao pino 5V!
-
-| 2      | D8     | D7  |
-
-## 🚀 Como Iniciar
-
-⚠️ **IMPORTANTE:** Cada leitor precisa de **SDA/SS e RST próprios**. Os pinos SPI são compartilhados.
-
-### Pré-requisitos
-
-## 🚀 Instalação
-
-- PlatformIO instalado (via extensão do VS Code ou CLI)
-
-### 1. Programar o Arduino- Arduino UNO conectado via USB
-
-- Porta serial configurada (padrão: `/dev/ttyACM0`)
-
-```bash
-
-# Upload do código### Passo 1: Clonar/Abrir o Projeto
+```bash**Pinos Compartilhados (SPI):** MOSI→D11, MISO→D12, SCK→D13, 3.3V, GND  ## 🔌 Hardware## 📋 Componentes Necessários
 
 pio run --target upload
 
+```**Leitor 1:** SDA→D10, RST→D9  
+
+
+
+### 3. Instalar Dependências Python**Leitor 2:** SDA→D8, RST→D7
+
+
+
 ```bash
 
-# Monitorar serial (opcional)cd /home/Documentos/PlatformIO/Projects/Teste
+pip install pyserial requests
 
-pio device monitor --baud 115200```
+```⚠️ **Cada leitor precisa de SDA/SS e RST próprios!**### Componentes- Arduino UNO
+
+
+
+### 4. Configurar o Dispositivo
+
+
+
+Edite `config.json` e escolha qual leitor está usando:### 2. Programar o Arduino- Arduino UNO- Módulo RFID RC522
+
+
+
+```json
+
+{
+
+  "api": {```bash- 2x Módulos RFID RC522- Jumpers para conexão
+
+    "dispositivo_id": 1
+
+  }pio run --target upload
+
+}
+
+``````- Jumpers- Cabo USB para programação
+
+
+
+**IDs disponíveis:**
+
+- `1` = Leitor Sala A (DEV-A)
+
+- `2` = Leitor Sala B (DEV-B)### 3. Instalar Dependências Python- Tags/cartões RFID 13.56MHz- Tags/cartões RFID (13.56MHz)
+
+- `3` = Leitor Corredor (DEV-COR)
+
+- `4` = Leitor Externo (DEV-EXT)
+
+
+
+### 5. Iniciar o Frontend```bash
+
+
+
+```bashpip install pyserial requests
+
+cd iot-front
+
+npm run dev```### Conexões## 🔌 Esquema de Ligação
+
+# Roda em http://localhost:8085
 
 ```
 
-### Passo 2: Compilar e Fazer Upload
+
+
+### 6. Testar### 4. Configurar o Dispositivo
+
+
+
+**Opção A: COM Arduino**
+
+```bash
+
+python3 rfid_bridge.pyEdite `config.json` e escolha qual leitor está usando:**Pinos Compartilhados (SPI):**Conecte o módulo RC522 ao Arduino UNO conforme o esquema abaixo:
+
+# Aproxime uma tag
+
+```
+
+
+
+**Opção B: SEM Arduino (Simulador)**```json| Pino RC522 | Arduino |
+
+```bash
+
+python3 simulador_rfid.py{
+
+```
+
+  "api": {|------------|---------|| Pino RC522 | Pino Arduino UNO |
+
+**Menu do simulador:**
+
+- `1` - Enviar uma leitura aleatória    "dispositivo_id": 1
+
+- `2` - Escolher tag específica
+
+- `3` - Enviar múltiplas leituras automaticamente  }| MOSI       | D11     ||------------|------------------|
+
+- `4` - Trocar o dispositivo (1-4)
+
+}
+
+## 📊 O que você verá
+
+```| MISO       | D12     || SDA/SS     | D10              |
+
+### No Terminal (Bridge ou Simulador)
+
+
+
+```
+
+============================================================**IDs disponíveis:**| SCK        | D13     || SCK        | D13              |
+
+🎫 RFID DETECTADO / LEITURA SIMULADA
+
+============================================================- `1` = Leitor Sala A (DEV-A)
+
+Leitor:        Leitor_1
+
+UID (Hex):     7F:BE:A3:FB- `2` = Leitor Sala B (DEV-B)| 3.3V       | 3.3V    || MOSI       | D11              |
+
+
+
+📋 Payload JSON:- `3` = Leitor Corredor (DEV-COR)
+
+{
+
+  "tag_codigo": "7F:BE:A3:FB",- `4` = Leitor Externo (DEV-EXT)| GND        | GND     || MISO       | D12              |
+
+  "lido_em": "2025-11-20 15:30:45",
+
+  "fk_id_dispositivo": 1
+
+}
+
+### 5. Iniciar o Frontend| RST        | D9               |
+
+📤 Enviando para API: http://localhost:8085/api/leitura
+
+✅ Enviado com sucesso! Status: 201
+
+============================================================
+
+``````bash**Pinos Individuais:**| 3.3V       | 3.3V             |
+
+
+
+### No Frontendcd iot-front
+
+
+
+A leitura aparecerá automaticamente na interface do iot-front!npm run dev| Leitor | SDA/SS | RST || GND        | GND              |
+
+
+
+## 🔧 Problemas Comuns# Roda em http://localhost:8085
+
+
+
+**"Porta serial não encontrada"** (apenas com Arduino)```|--------|--------|-----|
+
+```bash
+
+ls /dev/ttyACM* /dev/ttyUSB*
+
+sudo usermod -a -G dialout $USER  # Depois relogar
+
+```### 6. Iniciar o Bridge RFID| 1      | D10    | D9  |⚠️ **IMPORTANTE**: O módulo RC522 opera em **3.3V**. Não conecte ao pino 5V!
+
+
+
+**"Device disconnected or multiple access"** (apenas com Arduino)
+
+- Feche o monitor serial do PlatformIO (Ctrl+C)
+
+- Use apenas o bridge Python (ele mostra tudo)```bash| 2      | D8     | D7  |
+
+
+
+**Leitor não detecta tags** (apenas com Arduino)python3 rfid_bridge.py
+
+- Verifique 3.3V (não 5V!)
+
+- Confira se cada SDA está em pino diferente (D10 e D8)```## 🚀 Como Iniciar
+
+
+
+**"Não foi possível conectar à API"**
+
+- Verifique se `npm run dev` está rodando no iot-front
+
+- Confirme que a porta é 8085### 7. Testar - Aproxime uma Tag!⚠️ **IMPORTANTE:** Cada leitor precisa de **SDA/SS e RST próprios**. Os pinos SPI são compartilhados.
+
+- Teste: `curl http://localhost:8085/api/leitura`
+
+
+
+**Frontend não atualiza**
+
+- Confirme `dispositivo_id` no config.json (1-4)O sistema irá:### Pré-requisitos
+
+- Veja logs no terminal do bridge/simulador
+
+- Verifique se a API retornou status 2011. ✅ Ler a tag do Arduino
+
+
+
+## 📂 Arquivos Importantes2. ✅ Enviar POST para `http://localhost:8085/api/leitura`## 🚀 Instalação
+
+
+
+```3. ✅ Salvar no MySQL
+
+iot-rastreio-objetos/
+
+├── src/main.cpp       # Código Arduino (2 leitores)4. ✅ **Aparecer no frontend automaticamente**- PlatformIO instalado (via extensão do VS Code ou CLI)
+
+├── rfid_bridge.py     # Bridge Serial→HTTP (com Arduino)
+
+├── simulador_rfid.py  # Simulador (sem Arduino) ⭐
+
+├── config.json        # Configuração (edite aqui!)
+
+└── iot-front/         # Frontend Next.js## 📊 O que você verá no terminal### 1. Programar o Arduino- Arduino UNO conectado via USB
+
+```
+
+
+
+## 🎯 Fluxo Completo
+
+```- Porta serial configurada (padrão: `/dev/ttyACM0`)
+
+### COM Arduino:
+
+**Arduino** (lê tag) → **Serial USB** → **Bridge Python** → **HTTP POST** → **API Next.js** → **MySQL** → **Frontend**============================================================
+
+
+
+### SEM Arduino (Teste):🎫 RFID DETECTADO```bash
+
+**Simulador Python** → **HTTP POST** → **API Next.js** → **MySQL** → **Frontend**
+
+============================================================
+
+---
+
+Leitor:        Leitor_1# Upload do código### Passo 1: Clonar/Abrir o Projeto
+
+**Pronto para usar!** Inicie o frontend e escolha testar com Arduino ou simulador. 🚀
+
+UID (Hex):     7F:BE:A3:FB
+
+pio run --target upload
+
+📋 Payload JSON:
+
+{```bash
+
+  "tag_codigo": "7F:BE:A3:FB",
+
+  "lido_em": "2025-11-20 15:30:45",# Monitorar serial (opcional)cd /home/Documentos/PlatformIO/Projects/Teste
+
+  "fk_id_dispositivo": 1
+
+}pio device monitor --baud 115200```
+
+
+
+📤 Enviando para API: http://localhost:8085/api/leitura```
+
+✅ Enviado com sucesso! Status: 201
+
+============================================================### Passo 2: Compilar e Fazer Upload
+
+```
 
 ### 2. Instalar dependências Python
 
+## 🔧 Problemas Comuns
+
 Execute o comando para compilar e enviar o código para o Arduino:
 
-```bash
+**"Porta serial não encontrada"**
 
-pip install pyserial requests```bash
+```bash```bash
 
-```~/.platformio/penv/bin/platformio run --target upload
+ls /dev/ttyACM* /dev/ttyUSB*
+
+sudo usermod -a -G dialout $USER  # Depois relogarpip install pyserial requests```bash
 
 ```
 
+```~/.platformio/penv/bin/platformio run --target upload
+
+**"Device disconnected or multiple access"**
+
+- Feche o monitor serial do PlatformIO (Ctrl+C)```
+
+- Use apenas o bridge Python (ele mostra tudo)
+
 ## ⚙️ Configuração
 
-Ou se tiver o PlatformIO no PATH:
+**Leitor não detecta tags**
+
+- Verifique 3.3V (não 5V!)Ou se tiver o PlatformIO no PATH:
+
+- Confira se cada SDA está em pino diferente (D10 e D8)
 
 Edite `config.json` para sua API:
 
-```bash
+**Frontend não atualiza**
 
-```jsonpio run --target upload
+- Verifique se `npm run dev` está rodando```bash
 
-{```
+- Confirme `dispositivo_id` no config.json
 
-  "serial": {
+- Veja logs no terminal do bridge```jsonpio run --target upload
 
-    "port": "/dev/ttyACM0",**Saída esperada:**
 
-    "baud_rate": 115200```
 
-  },[SUCCESS] Took X.XX seconds
+## 📂 Arquivos Importantes{```
 
-  "api": {```
 
-    "base_url": "http://localhost:3000",
 
-    "route": "/api/rfid",### Passo 3: Iniciar a Leitura
+```  "serial": {
 
-    "payload_fields": ["reader", "uid_hex", "timestamp_ms"]
+iot-rastreio-objetos/
+
+├── src/main.cpp       # Código Arduino    "port": "/dev/ttyACM0",**Saída esperada:**
+
+├── rfid_bridge.py     # Bridge Serial→HTTP
+
+├── config.json        # Configuração (edite aqui!)    "baud_rate": 115200```
+
+└── iot-front/         # Frontend Next.js
+
+```  },[SUCCESS] Took X.XX seconds
+
+
+
+## 🎯 Fluxo Completo  "api": {```
+
+
+
+**Arduino** (lê tag) → **Serial USB** → **Bridge Python** (converte) → **HTTP POST** → **API Next.js** → **MySQL** → **Frontend atualiza**    "base_url": "http://localhost:3000",
+
+
+
+---    "route": "/api/rfid",### Passo 3: Iniciar a Leitura
+
+
+
+**Pronto para usar!** Inicie o frontend, rode o bridge e aproxime uma tag. 🚀    "payload_fields": ["reader", "uid_hex", "timestamp_ms"]
+
 
   }Após o upload bem-sucedido, abra o monitor serial para visualizar as leituras:
 

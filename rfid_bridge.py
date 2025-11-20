@@ -128,7 +128,13 @@ def create_payload(rfid_data):
         "time": lambda: now.strftime("%H:%M:%S"),
         "datetime": lambda: now.isoformat(),
         "timestamp_ms": lambda: int(time.time() * 1000),
-        "arduino_timestamp": lambda: rfid_data.get("timestamp")
+        "arduino_timestamp": lambda: rfid_data.get("timestamp"),
+        # Campos para a API iot-front
+        "tag_codigo": lambda: rfid_data.get("uid_hex"),  # UID em hex
+        "lido_em": lambda: now.strftime("%Y-%m-%d %H:%M:%S"),  # Formato MySQL
+        "rssi": lambda: -50,  # RFID não tem RSSI real, valor fixo simulado
+        "payload_json": lambda: json.dumps(rfid_data),  # JSON completo como string
+        "fk_id_dispositivo": lambda: config.get('api', {}).get('dispositivo_id', 1)
     }
 
     # Ordem padrão caso o usuário não forneça payload_fields
