@@ -4,18 +4,19 @@
 #include <MFRC522.h>
 
 /*
-  Ligações RC522 (Arduino UNO) - DOIS LEITORES:
+  Ligações RC522 (Arduino UNO) - TRÊS LEITORES:
   
   Pinos compartilhados (barramento SPI):
-  MOSI   -> D11 (ambos leitores)
-  MISO   -> D12 (ambos leitores)
-  SCK    -> D13 (ambos leitores)
-  3.3V   -> 3.3V (ambos leitores)
-  GND    -> GND (ambos leitores)
+  MOSI   -> D11 (todos leitores)
+  MISO   -> D12 (todos leitores)
+  SCK    -> D13 (todos leitores)
+  3.3V   -> 3.3V (todos leitores)
+  GND    -> GND (todos leitores)
   
   Pinos individuais:
   Leitor 1 - SDA/SS -> D10, RST -> D9
   Leitor 2 - SDA/SS -> D8,  RST -> D7
+  Leitor 3 - SDA/SS -> D4,  RST -> D3
 */
 
 // Leitor 1
@@ -26,8 +27,13 @@ constexpr uint8_t PIN_RST1 = 9;
 constexpr uint8_t PIN_SS2  = 8;
 constexpr uint8_t PIN_RST2 = 7;
 
+// Leitor 3
+constexpr uint8_t PIN_SS3  = 4;
+constexpr uint8_t PIN_RST3 = 3;
+
 MFRC522 mfrc522_1(PIN_SS1, PIN_RST1);
 MFRC522 mfrc522_2(PIN_SS2, PIN_RST2);
+MFRC522 mfrc522_3(PIN_SS3, PIN_RST3);
 
 // Função para testar comunicação básica de um leitor
 bool testRC522Communication(MFRC522 &reader, uint8_t ssPin, uint8_t rstPin, const char* readerName) {
@@ -38,6 +44,7 @@ bool testRC522Communication(MFRC522 &reader, uint8_t ssPin, uint8_t rstPin, cons
   // Desabilita TODOS os outros SS primeiro
   digitalWrite(PIN_SS1, HIGH);
   digitalWrite(PIN_SS2, HIGH);
+  digitalWrite(PIN_SS3, HIGH);
   delay(10);
   
   // Reset manual do módulo
@@ -139,29 +146,34 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) { delay(10); } // Aguarda serial estar pronta
   
-  Serial.println(F("\n=== Leitor RFID RC522 (UNO) - DOIS LEITORES ==="));
+  Serial.println(F("\n=== Leitor RFID RC522 (UNO) - TRÊS LEITORES ==="));
   
-  // Configura os pinos dos DOIS leitores
+  // Configura os pinos dos TRÊS leitores
   pinMode(PIN_RST1, OUTPUT);
   pinMode(PIN_SS1, OUTPUT);
   pinMode(PIN_RST2, OUTPUT);
   pinMode(PIN_SS2, OUTPUT);
+  pinMode(PIN_RST3, OUTPUT);
+  pinMode(PIN_SS3, OUTPUT);
   
   Serial.println(F("Configurando pinos..."));
   
-  // MUITO IMPORTANTE: Fazer hard reset em ambos os módulos primeiro
+  // MUITO IMPORTANTE: Fazer hard reset em todos os módulos primeiro
   digitalWrite(PIN_RST1, LOW);
   digitalWrite(PIN_RST2, LOW);
+  digitalWrite(PIN_RST3, LOW);
   delay(100);
   
   // SS deve estar HIGH (desabilitado) ANTES de ativar os módulos
   digitalWrite(PIN_SS1, HIGH);
   digitalWrite(PIN_SS2, HIGH);
+  digitalWrite(PIN_SS3, HIGH);
   delay(50);
   
   // Agora ativa os módulos (RST HIGH)
   digitalWrite(PIN_RST1, HIGH);
   digitalWrite(PIN_RST2, HIGH);
+  digitalWrite(PIN_RST3, HIGH);
   delay(100);
   
   Serial.println(F("Inicializando SPI..."));
@@ -170,9 +182,10 @@ void setup() {
   
   Serial.println(F("Inicializando leitores MFRC522..."));
   
-  // Desabilita ambos os SS antes de inicializar
+  // Desabilita todos os SS antes de inicializar
   digitalWrite(PIN_SS1, HIGH);
   digitalWrite(PIN_SS2, HIGH);
+  digitalWrite(PIN_SS3, HIGH);
   delay(10);
   
   // Inicializa o leitor 1
@@ -191,13 +204,22 @@ void setup() {
   digitalWrite(PIN_SS2, HIGH);
   delay(50);
   
+  // Inicializa o leitor 3
+  digitalWrite(PIN_SS3, LOW);
+  delay(10);
+  mfrc522_3.PCD_Init();
+  delay(50);
+  digitalWrite(PIN_SS3, HIGH);
+  delay(50);
+  
   Serial.println(F("\nTestando comunicacao com os modulos..."));
   
   bool reader1OK = testRC522Communication(mfrc522_1, PIN_SS1, PIN_RST1, "Leitor 1 (SS=D10, RST=D9)");
   bool reader2OK = testRC522Communication(mfrc522_2, PIN_SS2, PIN_RST2, "Leitor 2 (SS=D8, RST=D7)");
+  bool reader3OK = testRC522Communication(mfrc522_3, PIN_SS3, PIN_RST3, "Leitor 3 (SS=D4, RST=D3)");
   
-  if (reader1OK && reader2OK) {
-    Serial.println(F("\n*** SUCESSO! Ambos leitores funcionando! ***"));
+  if (reader1OK && reader2OK && reader3OK) {
+    Serial.println(F("\n*** SUCESSO! Todos os 3 leitores funcionando! ***"));
     
     // Aumenta o ganho da antena para melhor leitura
     digitalWrite(PIN_SS1, LOW);
@@ -210,6 +232,12 @@ void setup() {
     delay(5);
     mfrc522_2.PCD_SetAntennaGain(mfrc522_2.RxGain_max);
     digitalWrite(PIN_SS2, HIGH);
+    delay(5);
+    
+    digitalWrite(PIN_SS3, LOW);
+    delay(5);
+    mfrc522_3.PCD_SetAntennaGain(mfrc522_3.RxGain_max);
+    digitalWrite(PIN_SS3, HIGH);
     
     Serial.println(F("Ganho das antenas configurado para maximo"));
     
@@ -230,6 +258,8 @@ void setup() {
     Serial.println(F("  Leitor 1 RST     ->  D9"));
     Serial.println(F("  Leitor 2 SDA/SS  ->  D8"));
     Serial.println(F("  Leitor 2 RST     ->  D7"));
+    Serial.println(F("  Leitor 3 SDA/SS  ->  D4"));
+    Serial.println(F("  Leitor 3 RST     ->  D3"));
     Serial.println(F("\nDicas:"));
     Serial.println(F("- Verifique se os jumpers estao bem conectados"));
     Serial.println(F("- O modulo deve estar alimentado com 3.3V (NAO 5V!)"));
@@ -249,6 +279,7 @@ bool processReader(MFRC522 &reader, uint8_t ssPin, const char* readerName) {
   // Desabilita TODOS os leitores primeiro
   digitalWrite(PIN_SS1, HIGH);
   digitalWrite(PIN_SS2, HIGH);
+  digitalWrite(PIN_SS3, HIGH);
   delayMicroseconds(10);
   
   // Habilita apenas este leitor
@@ -310,14 +341,20 @@ void loop() {
   // Tenta ler do Leitor 2
   bool read2 = processReader(mfrc522_2, PIN_SS2, "Leitor_2");
   
+  // Tenta ler do Leitor 3
+  bool read3 = processReader(mfrc522_3, PIN_SS3, "Leitor_3");
+  
   // Se algum leitor detectou tag, aguarda anti-duplicação
-  if (read1 || read2) {
+  if (read1 || read2 || read3) {
     delay(200);
     // Limpa possíveis leituras pendentes
     while (mfrc522_1.PICC_IsNewCardPresent() || mfrc522_1.PICC_ReadCardSerial()) {
       delay(50);
     }
     while (mfrc522_2.PICC_IsNewCardPresent() || mfrc522_2.PICC_ReadCardSerial()) {
+      delay(50);
+    }
+    while (mfrc522_3.PICC_IsNewCardPresent() || mfrc522_3.PICC_ReadCardSerial()) {
       delay(50);
     }
     

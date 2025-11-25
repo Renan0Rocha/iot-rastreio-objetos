@@ -86,6 +86,14 @@ REQUEST_TIMEOUT = api_conf.get('timeout', 5)
 API_HEADERS = api_conf.get('headers', {})
 SEND_MODE = api_conf.get('mode', 'full')  # 'hex' or 'full'
 
+# Mapeamento de leitores Arduino para IDs de dispositivos no banco
+# Baseado nos pinos RST: Leitor_1 (RST=D9), Leitor_2 (RST=D7), Leitor_3 (RST=D3)
+READER_TO_DEVICE_MAP = {
+    "Leitor_1": 1,  # DEV-A - Leitor Sala A (RST=D9, SS=D10)
+    "Leitor_2": 2,  # DEV-B - Leitor Sala B (RST=D7, SS=D8)
+    "Leitor_3": 4,  # DEV-EXT - Leitor Externo (RST=D3, SS=D4)
+}
+
 # Cor para terminal
 class Colors:
     GREEN = '\033[92m'
@@ -117,10 +125,14 @@ def create_payload(rfid_data):
         dict: Payload formatado com timestamp
     """
     now = datetime.now()
+    
+    # Obtém o nome do leitor e mapeia para o ID do dispositivo
+    reader_name = rfid_data.get("reader", "unknown")
+    device_id = READER_TO_DEVICE_MAP.get(reader_name, 1)  # Default para 1 se não encontrar
 
     # Campos disponíveis e suas funções geradoras
     available = {
-        "reader": lambda: rfid_data.get("reader", "unknown"),
+        "reader": lambda: reader_name,
         "uid_decimal": lambda: rfid_data.get("uid_decimal"),
         "uid_hex": lambda: rfid_data.get("uid_hex"),
         "card_type": lambda: rfid_data.get("card_type"),
@@ -134,7 +146,7 @@ def create_payload(rfid_data):
         "lido_em": lambda: now.strftime("%Y-%m-%d %H:%M:%S"),  # Formato MySQL
         "rssi": lambda: -50,  # RFID não tem RSSI real, valor fixo simulado
         "payload_json": lambda: json.dumps(rfid_data),  # JSON completo como string
-        "fk_id_dispositivo": lambda: config.get('api', {}).get('dispositivo_id', 1)
+        "fk_id_dispositivo": lambda: device_id  # ID baseado no mapeamento do leitor
     }
 
     # Ordem padrão caso o usuário não forneça payload_fields
